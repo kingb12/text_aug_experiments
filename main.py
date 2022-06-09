@@ -136,7 +136,7 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['test'],
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=4)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=8)],
         # for accuracy, we need no arguments but for F1 we need to specify 'macro' average:
             # ‘macro’: Calculate metrics for each label, and find their unweighted mean.
             # This does not take label imbalance into account (ok for us, we balanced the classes)
