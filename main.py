@@ -1,12 +1,17 @@
-# Adapting from this tutorial: https://huggingface.co/docs/transformers/training
+# Adapting the BERT training from this tutorial: https://huggingface.co/docs/transformers/training
 import json
+import os
 import sys
 from collections import Counter
 from typing import List, Any, Dict
 
 import numpy as np
+import torch.cuda
 import wandb as wandb
-from datasets import load_dataset, DatasetDict, load_metric, Metric
+from datasets import load_dataset, DatasetDict, load_metric, Metric, concatenate_datasets
+import nlpaug.flow as naf
+import nlpaug.augmenter.word as naw
+from nlpaug import Augmenter
 from transformers import AutoTokenizer, PreTrainedTokenizer, BatchEncoding, PreTrainedModel, \
     AutoModelForSequenceClassification, TrainingArguments, Trainer, EvalPrediction, EarlyStoppingCallback
 
@@ -45,8 +50,31 @@ def compute_metrics(eval_pred: EvalPrediction, acc_metric: Metric, f1_metric: Me
     return result
 
 
+def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: DatasetDict, num_aug_per_instance: int) -> DatasetDict:
+    if augmentation_strategy == 'bert_substitute':
+        aug: Augmenter = naw.ContextualWordEmbsAug(model_path='bert-base-cased', action='substitute',
+                                                   device=torch.cuda.is_available() and 'cuda:0' or 'cpu',
+                                                   batch_size=128)
+    else:
+        raise NotImplementedError(f"{augmentation_strategy} not supported")
+    augmentations: List[DatasetDict] = []
+    for _ in range(num_aug_per_instance):
+        # create a unique augmentation: dataset.map requires equal length in/out, hence add to list + concatenate
+        augmentations.append(dataset.map(lambda example_batch: {"text": aug.augment(example_batch['text'])},
+                                         batched=True, batch_size=128))
+    # merge to one dataset and return
+    for split in dataset:
+        dataset[split] = concatenate_datasets([dataset[split]] + [a[split] for a in augmentations])
+    dataset = dataset.shuffle(seed=42)
+
+    # save this for later use TODO: make correct use of this
+    dataset.save_to_disk(f"{os.getcwd()}/data/{dataset_name}/length_{len(dataset['train'])}/num_aug_{num_aug_per_instance}")
+    return dataset
+
+
 def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo_answers",
-         run_name: str = "test", run_group: str = "test", num_examples_per_class: int = 100, **kwargs):
+         run_name: str = "test", run_group: str = "test", num_examples_per_class: int = 100,
+         augmentation_strategy: str = None, num_aug_per_instance: int = 5, **kwargs):
     dataset: DatasetDict = load_dataset(dataset_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -60,6 +88,8 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
 
         dataset[split] = dataset[split].shuffle(seed=42).filter(only_n_per_class)
 
+    if augmentation_strategy:
+        dataset = augment_dataset(dataset_name, augmentation_strategy, dataset, num_aug_per_instance)
     # tokenize all the texts
     dataset = dataset.map(lambda example_batch: tokenize_function(example_batch, tokenizer))
 
@@ -127,6 +157,7 @@ if __name__ == '__main__':
             "eval_steps": 10,
             "save_steps": 10,
             "logging_steps": 10,
+            "augmentation_strategy": "bert_substitute"
         }
     run = wandb.init(project="text-aug-experiments", entity="kingb12", name=kwargs.get("run_name", "test"),
                      notes=kwargs.get("run_notes", "test"), group=kwargs.get("run_group", "test"))
