@@ -75,14 +75,7 @@ def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: Data
         dataset.save_to_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/length_{len(dataset['train'])}/num_aug_{num_aug_per_instance}")
     return dataset
 
-
-def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo_answers",
-         run_name: str = "test", run_group: str = "test", num_examples_per_class: int = 100,
-         augmentation_strategy: str = None, num_aug_per_instance: int = 5, **kwargs):
-    dataset: DatasetDict = load_dataset(dataset_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    # filter to just 10 per class
+def filter_to_n_per_class(dataset: DatasetDict, num_examples_per_class: int) -> DatasetDict:
     for split in dataset:
         example_class_counter: Counter[int] = Counter()
 
@@ -91,6 +84,17 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
             return example_class_counter[example['label']] <= num_examples_per_class
 
         dataset[split] = dataset[split].shuffle(seed=42).filter(only_n_per_class)
+    return dataset
+
+
+def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo_answers",
+         run_name: str = "test", run_group: str = "test", num_examples_per_class: int = 100,
+         augmentation_strategy: str = None, num_aug_per_instance: int = 5, **kwargs):
+    dataset: DatasetDict = load_dataset(dataset_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # filter to just N per class
+    dataset = filter_to_n_per_class(dataset, num_examples_per_class)
 
     # apply the augmentation strategy, if specified
     if augmentation_strategy:

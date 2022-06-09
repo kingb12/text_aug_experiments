@@ -1,13 +1,12 @@
 import json
 import os
 import sys
-from collections import Counter
 
 import wandb
 from datasets import load_from_disk, DatasetDict, load_dataset, load_metric, Metric
 from transformers import PreTrainedModel, AutoModelForSequenceClassification, TrainingArguments, Trainer, AutoTokenizer
 
-from train import augment_dataset, compute_metrics, tokenize_function
+from train import augment_dataset, compute_metrics, tokenize_function, filter_to_n_per_class
 
 
 def main(path_to_clean_model: str = "bert-base-cased",  path_to_aug_model: str = "bert-base-cased",
@@ -17,15 +16,10 @@ def main(path_to_clean_model: str = "bert-base-cased",  path_to_aug_model: str =
 
     # load the datasets
     clean_dataset: DatasetDict = load_dataset(dataset_name)
-    # filter to just 10 per class
-    for split in clean_dataset:
-        example_class_counter: Counter[int] = Counter()
 
-        def only_n_per_class(example) -> bool:
-            example_class_counter[example['label']] += 1
-            return example_class_counter[example['label']] <= num_examples_per_class
+    # filter to just N per class
+    clean_dataset = filter_to_n_per_class(clean_dataset, num_examples_per_class)
 
-        clean_dataset[split] = clean_dataset[split].shuffle(seed=42).filter(only_n_per_class)
     try:
         aug_dataset: DatasetDict = load_from_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/"
                                               f"length_{dataset_full_length}/num_aug_{num_aug_per_instance}")
