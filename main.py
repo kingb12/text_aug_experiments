@@ -88,8 +88,10 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
 
         dataset[split] = dataset[split].shuffle(seed=42).filter(only_n_per_class)
 
+    # apply the augmentation strategy, if specified
     if augmentation_strategy:
         dataset = augment_dataset(dataset_name, augmentation_strategy, dataset, num_aug_per_instance)
+
     # tokenize all the texts
     dataset = dataset.map(lambda example_batch: tokenize_function(example_batch, tokenizer))
 
