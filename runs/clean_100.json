@@ -1,0 +1,7 @@
+{
+  "model_name": "bert-base-cased",
+  "dataset_name": "Brendan/yahoo_answers",
+  "run_name": "clean_100",
+  "run_group": "clean_train",
+  "num_examples_per_class": 100
+}

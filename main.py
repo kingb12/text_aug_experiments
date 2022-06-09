@@ -81,7 +81,7 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         eval_steps=100,
         evaluation_strategy="steps",
         save_steps=100,
-        num_train_epochs=10,
+        num_train_epochs=20,
         logging_steps=200,
         save_total_limit=8,
         max_grad_norm=1.0,
@@ -124,9 +124,9 @@ if __name__ == '__main__':
     else:
         # some defaults
         kwargs = {
-            "eval_steps": 100,
-            "save_steps": 100,
-            "logging_steps": 100,
+            "eval_steps": 10,
+            "save_steps": 10,
+            "logging_steps": 10,
         }
     run = wandb.init(project="text-aug-experiments", entity="kingb12", name=kwargs.get("run_name", "test"),
                      notes=kwargs.get("run_notes", "test"), group=kwargs.get("run_group", "test"))
