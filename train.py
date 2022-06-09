@@ -8,7 +8,7 @@ from typing import List, Any, Dict
 import numpy as np
 import torch.cuda
 import wandb as wandb
-from datasets import load_dataset, DatasetDict, load_metric, Metric, concatenate_datasets
+from datasets import load_dataset, DatasetDict, load_metric, Metric, concatenate_datasets, load_from_disk
 import nlpaug.flow as naf
 import nlpaug.augmenter.word as naw
 from nlpaug import Augmenter
@@ -51,24 +51,28 @@ def compute_metrics(eval_pred: EvalPrediction, acc_metric: Metric, f1_metric: Me
 
 
 def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: DatasetDict, num_aug_per_instance: int) -> DatasetDict:
-    if augmentation_strategy == 'bert_substitute':
-        aug: Augmenter = naw.ContextualWordEmbsAug(model_path='bert-base-cased', action='substitute',
-                                                   device=torch.cuda.is_available() and 'cuda:0' or 'cpu',
-                                                   batch_size=128)
-    else:
-        raise NotImplementedError(f"{augmentation_strategy} not supported")
-    augmentations: List[DatasetDict] = []
-    for _ in range(num_aug_per_instance):
-        # create a unique augmentation: dataset.map requires equal length in/out, hence add to list + concatenate
-        augmentations.append(dataset.map(lambda example_batch: {"text": aug.augment(example_batch['text'])},
-                                         batched=True, batch_size=128))
-    # merge to one dataset and return
-    for split in dataset:
-        dataset[split] = concatenate_datasets([dataset[split]] + [a[split] for a in augmentations])
-    dataset = dataset.shuffle(seed=42)
+    try:
+        dataset = load_from_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/"
+                                              f"length_{len(dataset['train']) * (num_aug_per_instance + 1)}/num_aug_{num_aug_per_instance}")
+    except BaseException as e:
+        if augmentation_strategy == 'bert_substitute':
+            aug: Augmenter = naw.ContextualWordEmbsAug(model_path='bert-base-cased', action='substitute',
+                                                       device=torch.cuda.is_available() and 'cuda:0' or 'cpu',
+                                                       batch_size=128)
+        else:
+            raise NotImplementedError(f"{augmentation_strategy} not supported")
+        augmentations: List[DatasetDict] = []
+        for _ in range(num_aug_per_instance):
+            # create a unique augmentation: dataset.map requires equal length in/out, hence add to list + concatenate
+            augmentations.append(dataset.map(lambda example_batch: {"text": aug.augment(example_batch['text'])},
+                                             batched=True, batch_size=128))
+        # merge to one dataset and return
+        for split in dataset:
+            dataset[split] = concatenate_datasets([dataset[split]] + [a[split] for a in augmentations])
+        dataset = dataset.shuffle(seed=42)
 
-    # save this for later use TODO: make correct use of this
-    dataset.save_to_disk(f"{os.getcwd()}/data/{dataset_name}/length_{len(dataset['train'])}/num_aug_{num_aug_per_instance}")
+        # save this for later use
+        dataset.save_to_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/length_{len(dataset['train'])}/num_aug_{num_aug_per_instance}")
     return dataset
 
 
@@ -137,9 +141,6 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         train_dataset=dataset['train'],
         eval_dataset=dataset['test'],
         callbacks=[EarlyStoppingCallback(early_stopping_patience=8)],
-        # for accuracy, we need no arguments but for F1 we need to specify 'macro' average:
-            # ‘macro’: Calculate metrics for each label, and find their unweighted mean.
-            # This does not take label imbalance into account (ok for us, we balanced the classes)
         compute_metrics=lambda eval_pred: compute_metrics(eval_pred=eval_pred, acc_metric=acc_metric, f1_metric=f1_metric),
     )
 
