@@ -75,6 +75,7 @@ def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: Data
         dataset.save_to_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/length_{len(dataset['train'])}/num_aug_{num_aug_per_instance}")
     return dataset
 
+
 def filter_to_n_per_class(dataset: DatasetDict, num_examples_per_class: int) -> DatasetDict:
     for split in dataset:
         example_class_counter: Counter[int] = Counter()
