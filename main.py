@@ -2,10 +2,9 @@
 import json
 import sys
 from collections import Counter
-from typing import List, Any, Dict, Tuple
+from typing import List, Any, Dict
 
 import numpy as np
-import torch
 import wandb as wandb
 from datasets import load_dataset, DatasetDict, load_metric, Metric
 from transformers import AutoTokenizer, PreTrainedTokenizer, BatchEncoding, PreTrainedModel, \
@@ -87,10 +86,11 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         save_total_limit=8,
         max_grad_norm=1.0,
         metric_for_best_model="accuracy",
-        per_device_train_batch_size=64,
-        per_device_eval_batch_size=512,
+        per_device_train_batch_size=32,
+        per_device_eval_batch_size=256,
         load_best_model_at_end=True,
         dataloader_num_workers=4,
+        fp16=True
     )
 
     # overwrite training arguments with anything from our key-word arguments (may come from config file)
@@ -112,6 +112,9 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
     )
 
     trainer.evaluate()
+    trainer.train()
+    trainer.evaluate(dataset['train'], metric_key_prefix="final_train")
+    trainer.evaluate(dataset['test'], metric_key_prefix="final_test")
 
 
 if __name__ == '__main__':
@@ -125,13 +128,8 @@ if __name__ == '__main__':
             "save_steps": 100,
             "logging_steps": 100,
         }
-    gpus: int = torch.cuda.device_count()
-    per_device_train_batch_size: int = kwargs.get('per_device_train_batch_size', 32)
-    kwargs['per_device_train_batch_size'] = per_device_train_batch_size
-    gradient_accumulation_steps: int = 64 // (per_device_train_batch_size * gpus)
     run = wandb.init(project="text-aug-experiments", entity="kingb12", name=kwargs.get("run_name", "test"),
                      notes=kwargs.get("run_notes", "test"), group=kwargs.get("run_group", "test"))
     kwargs['push_to_hub_model_id'] = run.name
-    kwargs['gradient_accumulation_steps'] = gradient_accumulation_steps
     wandb.log(kwargs)
     main(**kwargs)
