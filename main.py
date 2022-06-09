@@ -148,6 +148,8 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
     trainer.evaluate(dataset['train'], metric_key_prefix="final_train")
     trainer.evaluate(dataset['test'], metric_key_prefix="final_test")
 
+    trainer.save_model(f"./final_models/{run_group}/{run_name}")
+
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
