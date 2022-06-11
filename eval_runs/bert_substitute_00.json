@@ -1,0 +1,8 @@
+{
+  "path_to_aug_model": "final_models/clean_train/clean_100",
+  "path_to_clean_model": "final_models/clean_train/clean_100",
+  "augmentation_strategy": "bert_substitute",
+  "run_group": "eval",
+  "run_name": "bert_substitute_00",
+
+}

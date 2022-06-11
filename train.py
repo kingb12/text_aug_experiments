@@ -50,14 +50,17 @@ def compute_metrics(eval_pred: EvalPrediction, acc_metric: Metric, f1_metric: Me
     return result
 
 
-def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: DatasetDict, num_aug_per_instance: int) -> DatasetDict:
+def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: DatasetDict, num_aug_per_instance: int,
+                    augment_probability: float = 0.2) -> DatasetDict:
     try:
         dataset = load_from_disk(f"{os.getcwd()}/data/{dataset_name}/{augmentation_strategy}/"
-                                              f"length_{len(dataset['train']) * (num_aug_per_instance + 1)}/num_aug_{num_aug_per_instance}")
+                                              f"length_{len(dataset['train']) * (num_aug_per_instance)}/"
+                                 f"num_aug_{num_aug_per_instance}/aug_prob{augment_probability}")
     except BaseException as e:
         if augmentation_strategy == 'bert_substitute':
             aug: Augmenter = naw.ContextualWordEmbsAug(model_path='bert-base-cased', action='substitute',
                                                        device=torch.cuda.is_available() and 'cuda:0' or 'cpu',
+                                                       aug_p=augment_probability,
                                                        batch_size=128)
         else:
             raise NotImplementedError(f"{augmentation_strategy} not supported")
@@ -68,7 +71,7 @@ def augment_dataset(dataset_name: str, augmentation_strategy: str, dataset: Data
                                              batched=True, batch_size=128))
         # merge to one dataset and return
         for split in dataset:
-            dataset[split] = concatenate_datasets([dataset[split]] + [a[split] for a in augmentations])
+            dataset[split] = concatenate_datasets([a[split] for a in augmentations])
         dataset = dataset.shuffle(seed=42)
 
         # save this for later use
@@ -90,7 +93,7 @@ def filter_to_n_per_class(dataset: DatasetDict, num_examples_per_class: int) -> 
 
 def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo_answers",
          run_name: str = "test", run_group: str = "test", num_examples_per_class: int = 100,
-         augmentation_strategy: str = None, num_aug_per_instance: int = 5, **kwargs):
+         augmentation_strategy: str = None, num_aug_per_instance: int = 1, **kwargs):
     dataset: DatasetDict = load_dataset(dataset_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -122,7 +125,7 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         eval_steps=100,
         evaluation_strategy="steps",
         save_steps=100,
-        num_train_epochs=20,
+        num_train_epochs=5,
         logging_steps=200,
         save_total_limit=8,
         max_grad_norm=1.0,
@@ -145,7 +148,6 @@ def main(model_name: str = "bert-base-cased", dataset_name: str = "Brendan/yahoo
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['test'],
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=8)],
         compute_metrics=lambda eval_pred: compute_metrics(eval_pred=eval_pred, acc_metric=acc_metric, f1_metric=f1_metric),
     )
 

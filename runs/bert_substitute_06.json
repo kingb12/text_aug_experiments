@@ -1,0 +1,9 @@
+{
+  "model_name": "bert-base-cased",
+  "dataset_name": "Brendan/yahoo_answers",
+  "run_name": "bert_substitute_06",
+  "run_group": "bert_substitute_train",
+  "num_examples_per_class": 100,
+  "augmentation_strategy": "bert_substitute",
+  "augment_probability": 0.6
+}
