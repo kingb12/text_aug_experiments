@@ -14,6 +14,8 @@ provided to run these in a queue given a fixed number of GPUs.
 `eval_affinity_diversity.py` is used to log the one result not included at training time, a clean-trained model's test
 accuracy on augmented data. 
 
-`export_csv.py` downloads and processes the results from Weights & biases.
+`export_csv.py` downloads and processes the results from Weights & biases. 
+
+[Our `wandb` runs can be viewed here](https://wandb.ai/kingb12/text-aug-experiments)
 
 `generate_plot_from_runs.py` constructs the above plot from this data.
